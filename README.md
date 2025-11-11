@@ -80,11 +80,3 @@ python -m PyInstaller --name "PDF_A_Converter" --onefile --windowed main.py
 ```
 
 4. Test the `dist\PDF_A_Converter.exe` on Windows with Ghostscript installed.
-
-If you want, I can also:
-- Add a small `build.ps1` script to automate the build steps for PowerShell.
-- Suggest `--add-data` lines if you tell me which asset files/folders must be bundled.
-
----
-
-File created: `README.md`
