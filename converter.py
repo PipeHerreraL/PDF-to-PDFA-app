@@ -4,17 +4,18 @@ import urllib.request
 import tempfile
 import shutil
 import time
+from pathlib import Path
 
 def ensure_ghostscript_installed():
     """Verifica e instala Ghostscript si es necesario."""
-    gs_path = find_ghostscript()
+    gs_path = get_ghostscript_command()
     if gs_path:
         return True  # Ya instalado
 
     print("Ghostscript no está instalado. Iniciando descarga...")
 
     try:
-        # URL del instalador oficial (versión estable)
+        # URL del instalador oficial (versión estable, actualizar según necesidad)
         gs_url = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10060/gs10060w64.exe"
 
         temp_dir = tempfile.gettempdir()
@@ -23,20 +24,19 @@ def ensure_ghostscript_installed():
         urllib.request.urlretrieve(gs_url, installer_path)
         print(f"Instalador descargado en: {installer_path}")
 
-        # Ejecutar el instalador y esperar a que finalice
-        print("Ejecutando instalador de Ghostscript, espera unos segundos...")
-        result = subprocess.run([installer_path, "/S"], shell=True)  # /S instala en modo silencioso
-
+        # Ejecutar el instalador silencioso
+        print("Ejecutando instalador de Ghostscript...")
+        result = subprocess.run([installer_path, "/S"], shell=True)  # /S modo silencioso
         if result.returncode != 0:
             print("⚠️ El instalador devolvió un código de error.")
             return False
 
         print("Instalación completada. Verificando...")
 
-        # Esperar a que Windows registre los nuevos binarios
+        # Esperar unos segundos a que Windows registre el nuevo binario
         for _ in range(10):
             time.sleep(2)
-            gs_path = find_ghostscript()
+            gs_path = get_ghostscript_command()
             if gs_path:
                 print(f"✅ Ghostscript detectado en: {gs_path}")
                 add_ghostscript_to_path(gs_path)
@@ -50,18 +50,18 @@ def ensure_ghostscript_installed():
         return False
 
 
-def find_ghostscript():
-    """Busca Ghostscript en PATH o rutas comunes."""
-    paths_to_try = [
-        shutil.which("gs"),
-        shutil.which("gswin64c"),
-        shutil.which("gswin32c"),
-    ]
+def get_ghostscript_command():
+    """Detecta el comando correcto de Ghostscript y agrega su carpeta al PATH temporal del proceso."""
+    candidates = ["gs", "gswin64c", "gswin32c"]
 
-    for p in paths_to_try:
-        if p:
-            return p
+    for cmd in candidates:
+        path = shutil.which(cmd)
+        if path:
+            # Agregar carpeta al PATH del proceso actual
+            os.environ["PATH"] += os.pathsep + str(Path(path).parent)
+            return cmd
 
+    # Intentar rutas comunes de instalación
     common_bases = [
         r"C:\Program Files\gs",
         r"C:\Program Files (x86)\gs",
@@ -70,15 +70,17 @@ def find_ghostscript():
     for base in common_bases:
         if os.path.exists(base):
             for folder in os.listdir(base):
-                candidate = os.path.join(base, folder, "bin", "gswin64c.exe")
-                if os.path.exists(candidate):
-                    return candidate
+                candidate = Path(base) / folder / "bin" / "gswin64c.exe"
+                if candidate.exists():
+                    os.environ["PATH"] += os.pathsep + str(candidate.parent)
+                    return str(candidate)
+
     return None
 
 
 def add_ghostscript_to_path(gs_path):
-    """Agrega el directorio de Ghostscript al PATH del usuario."""
-    gs_dir = os.path.dirname(gs_path)
+    """Agrega el directorio de Ghostscript al PATH del usuario (para nuevas terminales)."""
+    gs_dir = str(Path(gs_path).parent)
     current_path = os.environ.get("PATH", "")
 
     if gs_dir.lower() in current_path.lower():
@@ -90,19 +92,9 @@ def add_ghostscript_to_path(gs_path):
     print("✅ Ruta agregada correctamente (efectiva en nuevas terminales).")
     return True
 
-def get_ghostscript_command():
-    """Detecta el comando correcto de Ghostscript en el sistema."""
-    if shutil.which("gs"):
-        return "gs"
-    elif shutil.which("gswin64c"):
-        return "gswin64c"
-    elif shutil.which("gswin32c"):
-        return "gswin32c"
-    else:
-        return None
-
 
 def convert_to_pdfa(input_path, output_path):
+    """Convierte un PDF a PDF/A usando Ghostscript."""
     gs_command = get_ghostscript_command()
     if not gs_command:
         return False, "No se encontró Ghostscript en el sistema."

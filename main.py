@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from pathlib import Path
 
 # Importar funciones del convertidor
-from converter import convert_to_pdfa, ensure_ghostscript_installed, find_ghostscript, add_ghostscript_to_path
+from converter import convert_to_pdfa, ensure_ghostscript_installed, get_ghostscript_command
 
 
 class ConverterThread(QThread):
@@ -123,20 +123,20 @@ def main():
     # 1️⃣ Verificar Ghostscript antes de abrir la app
     if not ensure_ghostscript_installed():
         QMessageBox.critical(None, "Error",
-                             "No se pudo instalar Ghostscript automáticamente.\n"
-                             "Por favor instálalo manualmente desde:\n"
-                             "https://ghostscript.com/releases/gsdnld.html")
+                            "No se pudo instalar Ghostscript automáticamente.\n"
+                            "Por favor instálalo manualmente desde:\n"
+                            "https://ghostscript.com/releases/gsdnld.html")
         sys.exit()
 
     # 2️⃣ Intentar encontrar el ejecutable y agregarlo al PATH
-    gs_path = find_ghostscript()
-    if gs_path:
-        add_ghostscript_to_path(gs_path)
-    else:
+# Intentar obtener el comando de Ghostscript
+    gs_cmd = get_ghostscript_command()
+    if not gs_cmd:
         QMessageBox.warning(None, "Advertencia",
                             "Ghostscript fue instalado, pero no se encontró automáticamente.\n"
                             "Por favor reinicia la aplicación o verifica la instalación manualmente.")
         sys.exit()
+
 
     # 3️⃣ Iniciar la ventana principal
     window = PDFConverterApp()
