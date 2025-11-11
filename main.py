@@ -5,14 +5,25 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from pathlib import Path
+import subprocess
+import os
 
-# Importar funciones del convertidor
 from converter import convert_to_pdfa, ensure_ghostscript_installed, get_ghostscript_command
+
+
+# Función para abrir la carpeta en el explorador
+def open_folder(path):
+    path = Path(path)
+    if path.exists():
+        if os.name == "nt":
+            subprocess.Popen(f'explorer "{path}"')
+        elif os.name == "posix":
+            subprocess.Popen(["xdg-open", str(path)])
 
 
 class ConverterThread(QThread):
     progress = pyqtSignal(int)
-    finished = pyqtSignal(bool)
+    finished = pyqtSignal(str)  # enviar la carpeta de salida
 
     def __init__(self, files, output_dirs):
         super().__init__()
@@ -34,8 +45,9 @@ class ConverterThread(QThread):
                 print(f"Error al convertir {file}: {error}")
 
             self.progress.emit(int(i / total * 100))
-        self.finished.emit(True)
 
+        # Emitir la carpeta de salida principal
+        self.finished.emit(str(self.output_dirs[0]))
 
 
 class PDFConverterApp(QWidget):
@@ -89,7 +101,6 @@ class PDFConverterApp(QWidget):
         )
 
         self.output_dirs = []
-
         for file in self.files:
             file_path = Path(file)
             if folder:
@@ -98,7 +109,6 @@ class PDFConverterApp(QWidget):
             else:
                 # Crear carpeta 'converted' junto al archivo original
                 output_dir = file_path.parent / "converted"
-
             output_dir.mkdir(parents=True, exist_ok=True)
             self.output_dirs.append(output_dir)
 
@@ -110,17 +120,20 @@ class PDFConverterApp(QWidget):
 
         self.btn_convert.setEnabled(False)
 
-    def on_finished(self, success):
+    def on_finished(self, output_dir):
         QMessageBox.information(self, "Completado", "Conversión terminada correctamente.")
         self.progress.setValue(100)
         self.btn_convert.setEnabled(True)
         self.label.setText("Seleccione archivos PDF para convertir a PDF/A")
 
+        # Abrir la carpeta donde se guardaron los PDFs convertidos
+        open_folder(output_dir)
+
 
 def main():
     app = QApplication(sys.argv)
 
-    # 1️⃣ Verificar Ghostscript antes de abrir la app
+    # Verificar Ghostscript antes de abrir la app
     if not ensure_ghostscript_installed():
         QMessageBox.critical(None, "Error",
                             "No se pudo instalar Ghostscript automáticamente.\n"
@@ -128,8 +141,7 @@ def main():
                             "https://ghostscript.com/releases/gsdnld.html")
         sys.exit()
 
-    # 2️⃣ Intentar encontrar el ejecutable y agregarlo al PATH
-# Intentar obtener el comando de Ghostscript
+    # Intentar obtener el comando de Ghostscript para asegurarnos que funcione
     gs_cmd = get_ghostscript_command()
     if not gs_cmd:
         QMessageBox.warning(None, "Advertencia",
@@ -137,8 +149,6 @@ def main():
                             "Por favor reinicia la aplicación o verifica la instalación manualmente.")
         sys.exit()
 
-
-    # 3️⃣ Iniciar la ventana principal
     window = PDFConverterApp()
     window.show()
     sys.exit(app.exec())
