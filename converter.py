@@ -94,23 +94,39 @@ def add_ghostscript_to_path(gs_path):
 
 
 def convert_to_pdfa(input_path, output_path):
-    """Convierte un PDF a PDF/A usando Ghostscript."""
+    """Convierte un PDF a PDF/A usando Ghostscript de manera completamente silenciosa."""
     gs_command = get_ghostscript_command()
     if not gs_command:
         return False, "No se encontró Ghostscript en el sistema."
 
     try:
-        subprocess.run([
-            gs_command,
-            "-dPDFA=2",
-            "-dBATCH",
-            "-dNOPAUSE",
-            "-dNOOUTERSAVE",
-            "-sProcessColorModel=DeviceCMYK",
-            "-sDEVICE=pdfwrite",
-            f"-sOutputFile={output_path}",
-            input_path
-        ], check=True)
+        creationflags = 0
+        startupinfo = None
+
+        if os.name == 'nt':
+            # Evita que se abra la ventana de consola en Windows
+            creationflags = subprocess.CREATE_NO_WINDOW
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+        subprocess.run(
+            [
+                gs_command,
+                "-dPDFA=2",
+                "-dBATCH",
+                "-dNOPAUSE",
+                "-dNOOUTERSAVE",
+                "-sProcessColorModel=DeviceCMYK",
+                "-sDEVICE=pdfwrite",
+                f"-sOutputFile={output_path}",
+                input_path
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            startupinfo=startupinfo,
+            creationflags=creationflags
+        )
         return True, None
     except subprocess.CalledProcessError as e:
         return False, str(e)
