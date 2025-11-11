@@ -29,3 +29,6 @@ Thumbs.db
 
 # Converted PDFs (no subir archivos generados)
 converted/
+
+# Inno Setup files
+inno/
